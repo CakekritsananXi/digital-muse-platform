@@ -1,11 +1,14 @@
-
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Camera, Image, Star, Settings, Palette, Grid3X3, Sun, Moon, Lightbulb, Save, History, Share2, Download, Play } from "lucide-react";
-import { useState } from "react";
+import { Progress } from "@/components/ui/progress";
+import { Camera, Image, Star, Settings, Palette, Grid3X3, Sun, Moon, Lightbulb, Save, History, Share2, Download, Play, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useImageGeneration } from "@/hooks/useImageGeneration";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 export const CreativeStudio = () => {
   const [selectedStyle, setSelectedStyle] = useState("photorealistic");
@@ -15,6 +18,12 @@ export const CreativeStudio = () => {
   const [mood, setMood] = useState([60]);
   const [lighting, setLighting] = useState("studio");
   const [composition, setComposition] = useState("rule-of-thirds");
+  const [currentImage, setCurrentImage] = useState("https://i.postimg.cc/MGvX0j5n/LINE-ALBUM-2025-5-30-250607-1.jpg");
+  const [generatedImages, setGeneratedImages] = useState<any[]>([]);
+  const [currentGeneration, setCurrentGeneration] = useState<any>(null);
+
+  const { isGenerating, generationProgress, generateImage, pollGenerationStatus } = useImageGeneration();
+  const { toast } = useToast();
 
   const styleCategories = {
     artistic: [
@@ -55,6 +64,73 @@ export const CreativeStudio = () => {
     "Abstract artistic composition with flowing organic shapes and vibrant colors"
   ];
 
+  // Load user's generated images
+  useEffect(() => {
+    loadGeneratedImages();
+  }, []);
+
+  const loadGeneratedImages = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: images, error } = await supabase
+        .from('generated_images')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) {
+        console.error('Error loading images:', error);
+        return;
+      }
+
+      setGeneratedImages(images || []);
+      
+      // Set the most recent completed image as current
+      const latestCompleted = images?.find(img => img.status === 'completed' && img.image_url);
+      if (latestCompleted) {
+        setCurrentImage(latestCompleted.image_url);
+      }
+    } catch (error) {
+      console.error('Error loading images:', error);
+    }
+  };
+
+  const handleGenerate = async () => {
+    const result = await generateImage({
+      prompt,
+      style_preset: selectedStyle,
+      lighting_preset: lighting,
+      composition_guide: composition,
+      artistic_style: artisticStyle[0],
+      creativity: creativity[0],
+      mood: mood[0]
+    });
+
+    if (result) {
+      setCurrentGeneration(result);
+      
+      // Start polling for status
+      const pollInterval = await pollGenerationStatus(result.image_id, (status) => {
+        if (status.status === 'completed' && status.image_url) {
+          setCurrentImage(status.image_url);
+          loadGeneratedImages();
+          setCurrentGeneration(null);
+        } else if (status.status === 'failed') {
+          setCurrentGeneration(null);
+        }
+      });
+
+      // Cleanup interval after 5 minutes
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        setCurrentGeneration(null);
+      }, 300000);
+    }
+  };
+
   return (
     <section id="studio" className="py-20 relative">
       <div className="container mx-auto px-6">
@@ -64,7 +140,7 @@ export const CreativeStudio = () => {
             <span className="gradient-text">Studio</span>
           </h2>
           <p className="text-xl text-foreground/70 max-w-3xl mx-auto">
-            Advanced creative workspace with professional-grade tools for artistic image generation
+            Advanced creative workspace with professional-grade AI image generation
           </p>
         </div>
 
@@ -91,7 +167,7 @@ export const CreativeStudio = () => {
               </div>
               <div className="text-sm text-foreground/60">
                 <p>Current Session: "Fashion Portrait Series"</p>
-                <p>Last saved: 2 minutes ago</p>
+                <p>Generated Images: {generatedImages.length}</p>
               </div>
             </Card>
 
@@ -305,7 +381,7 @@ export const CreativeStudio = () => {
               {/* Canvas Area with Composition Guide */}
               <div className="relative aspect-square bg-black/30 rounded-lg border border-gold-500/20 overflow-hidden">
                 <img
-                  src="https://i.postimg.cc/MGvX0j5n/LINE-ALBUM-2025-5-30-250607-1.jpg"
+                  src={currentImage}
                   alt="Canvas preview"
                   className="w-full h-full object-cover"
                 />
@@ -320,6 +396,18 @@ export const CreativeStudio = () => {
                     </div>
                   </div>
                 )}
+
+                {/* Generation Progress Overlay */}
+                {(isGenerating || currentGeneration) && (
+                  <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center">
+                    <div className="text-center text-white p-6">
+                      <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
+                      <p className="text-lg font-semibold mb-2">Creating Your Masterpiece</p>
+                      <p className="text-sm text-foreground/80 mb-4">AI is generating your artistic vision...</p>
+                      <Progress value={generationProgress} className="w-full max-w-xs mx-auto" />
+                    </div>
+                  </div>
+                )}
                 
                 {/* Generation Status */}
                 <div className="absolute bottom-4 left-4 right-4">
@@ -327,9 +415,23 @@ export const CreativeStudio = () => {
                     <div className="text-sm text-foreground/80">
                       Resolution: 1024×1024 • Style: {selectedStyle} • {lighting} lighting
                     </div>
-                    <Button size="sm" className="bg-gradient-to-r from-gold-500 to-gold-600 text-black hover:from-gold-400 hover:to-gold-500">
-                      <Play className="w-4 h-4 mr-2" />
-                      Generate
+                    <Button 
+                      size="sm" 
+                      className="bg-gradient-to-r from-gold-500 to-gold-600 text-black hover:from-gold-400 hover:to-gold-500"
+                      onClick={handleGenerate}
+                      disabled={isGenerating || !prompt.trim()}
+                    >
+                      {isGenerating ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Generating
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-4 h-4 mr-2" />
+                          Generate
+                        </>
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -338,22 +440,34 @@ export const CreativeStudio = () => {
 
             {/* Version History */}
             <Card className="glass-card p-6">
-              <h3 className="text-lg font-playfair font-semibold mb-4 gradient-text">Version History</h3>
+              <h3 className="text-lg font-playfair font-semibold mb-4 gradient-text">Recent Generations</h3>
               <div className="grid grid-cols-4 gap-3">
-                {[
-                  "https://i.postimg.cc/PfmJMHWQ/LINE-ALBUM-2025-5-30-250607-4.jpg",
-                  "https://i.postimg.cc/28G5PxXq/LINE-ALBUM-2025-5-30-250607-5.jpg",
-                  "https://i.postimg.cc/pVYVFZv0/LINE-ALBUM-2025-5-30-250607-6.jpg",
-                  "https://i.postimg.cc/tTFqDdx4/LINE-ALBUM-2025-5-30-250607-7.jpg"
-                ].map((image, index) => (
-                  <div key={index} className="relative artistic-frame premium-hover aspect-square group">
-                    <img
-                      src={image}
-                      alt={`Version ${index + 1}`}
-                      className="w-full h-full object-cover"
-                    />
+                {generatedImages.slice(0, 8).map((image, index) => (
+                  <div key={image.id} className="relative artistic-frame premium-hover aspect-square group">
+                    {image.status === 'completed' && image.image_url ? (
+                      <img
+                        src={image.image_url}
+                        alt={`Generated ${index + 1}`}
+                        className="w-full h-full object-cover cursor-pointer"
+                        onClick={() => setCurrentImage(image.image_url)}
+                      />
+                    ) : image.status === 'processing' ? (
+                      <div className="w-full h-full bg-black/30 flex items-center justify-center">
+                        <Loader2 className="w-6 h-6 animate-spin text-gold-400" />
+                      </div>
+                    ) : (
+                      <div className="w-full h-full bg-black/30 flex items-center justify-center">
+                        <span className="text-xs text-red-400">Failed</span>
+                      </div>
+                    )}
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Badge className="bg-gold-500 text-black">v{index + 1}</Badge>
+                      <Badge className={`${
+                        image.status === 'completed' ? 'bg-green-500' :
+                        image.status === 'processing' ? 'bg-yellow-500' :
+                        'bg-red-500'
+                      } text-white`}>
+                        {image.status}
+                      </Badge>
                     </div>
                   </div>
                 ))}

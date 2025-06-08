@@ -46,6 +46,13 @@ export type Database = {
             referencedRelation: "generated_images"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "collection_images_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "popular_images"
+            referencedColumns: ["id"]
+          },
         ]
       }
       collections: {
@@ -88,6 +95,13 @@ export type Database = {
             columns: ["cover_image_id"]
             isOneToOne: false
             referencedRelation: "generated_images"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collections_cover_image_id_fkey"
+            columns: ["cover_image_id"]
+            isOneToOne: false
+            referencedRelation: "popular_images"
             referencedColumns: ["id"]
           },
         ]
@@ -224,6 +238,13 @@ export type Database = {
             columns: ["image_id"]
             isOneToOne: false
             referencedRelation: "generated_images"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "image_interactions_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "popular_images"
             referencedColumns: ["id"]
           },
         ]
@@ -403,6 +424,42 @@ export type Database = {
         }
         Relationships: []
       }
+      usage_analytics_archive: {
+        Row: {
+          created_at: string
+          event_data: Json
+          event_type: string
+          id: string
+          ip_address: unknown | null
+          processed: boolean
+          session_id: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at: string
+          event_data: Json
+          event_type: string
+          id: string
+          ip_address?: unknown | null
+          processed: boolean
+          session_id?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_data?: Json
+          event_type?: string
+          id?: string
+          ip_address?: unknown | null
+          processed?: boolean
+          session_id?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_credits: {
         Row: {
           bonus_credits: number | null
@@ -455,7 +512,37 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      popular_images: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          credits_used: number | null
+          download_count: number | null
+          error_message: string | null
+          id: string | null
+          image_url: string | null
+          is_public: boolean | null
+          like_count: number | null
+          model: string | null
+          parameters: Json | null
+          processing_time_ms: number | null
+          prompt: string | null
+          safety_rating: Json | null
+          status: string | null
+          user_id: string | null
+          username: string | null
+          view_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_images_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       deduct_credits: {
@@ -471,6 +558,10 @@ export type Database = {
           reference_type?: string
         }
         Returns: boolean
+      }
+      refresh_popular_images: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       track_usage: {
         Args: {
