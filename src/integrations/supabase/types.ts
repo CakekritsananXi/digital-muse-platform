@@ -207,6 +207,42 @@ export type Database = {
           },
         ]
       }
+      generation_sessions: {
+        Row: {
+          failed_generations: number | null
+          id: string
+          metadata: Json | null
+          session_end: string | null
+          session_start: string
+          successful_generations: number | null
+          total_credits_used: number | null
+          total_generations: number | null
+          user_id: string | null
+        }
+        Insert: {
+          failed_generations?: number | null
+          id?: string
+          metadata?: Json | null
+          session_end?: string | null
+          session_start?: string
+          successful_generations?: number | null
+          total_credits_used?: number | null
+          total_generations?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          failed_generations?: number | null
+          id?: string
+          metadata?: Json | null
+          session_end?: string | null
+          session_start?: string
+          successful_generations?: number | null
+          total_credits_used?: number | null
+          total_generations?: number | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       image_interactions: {
         Row: {
           created_at: string
@@ -248,6 +284,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      model_performance: {
+        Row: {
+          avg_processing_time: number | null
+          id: string
+          model_id: string
+          success_rate: number | null
+          total_generations: number | null
+          updated_at: string | null
+          user_satisfaction: number | null
+        }
+        Insert: {
+          avg_processing_time?: number | null
+          id?: string
+          model_id: string
+          success_rate?: number | null
+          total_generations?: number | null
+          updated_at?: string | null
+          user_satisfaction?: number | null
+        }
+        Update: {
+          avg_processing_time?: number | null
+          id?: string
+          model_id?: string
+          success_rate?: number | null
+          total_generations?: number | null
+          updated_at?: string | null
+          user_satisfaction?: number | null
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -343,6 +409,58 @@ export type Database = {
           },
         ]
       }
+      quality_assessments: {
+        Row: {
+          artistic_score: number | null
+          assessed_by: string | null
+          created_at: string | null
+          id: string
+          image_id: string | null
+          overall_score: number | null
+          technical_score: number | null
+        }
+        Insert: {
+          artistic_score?: number | null
+          assessed_by?: string | null
+          created_at?: string | null
+          id?: string
+          image_id?: string | null
+          overall_score?: number | null
+          technical_score?: number | null
+        }
+        Update: {
+          artistic_score?: number | null
+          assessed_by?: string | null
+          created_at?: string | null
+          id?: string
+          image_id?: string | null
+          overall_score?: number | null
+          technical_score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quality_assessments_assessed_by_fkey"
+            columns: ["assessed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quality_assessments_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "generated_images"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quality_assessments_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "popular_images"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscriptions: {
         Row: {
           cancel_at_period_end: boolean
@@ -387,6 +505,35 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      teams: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          owner_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+          owner_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          owner_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teams_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       usage_analytics: {
         Row: {
