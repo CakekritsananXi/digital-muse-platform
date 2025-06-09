@@ -9,6 +9,8 @@ import { useState, useEffect } from "react";
 import { useImageGeneration } from "@/hooks/useImageGeneration";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/components/AuthProvider";
+import { GenerationMonitor } from "@/components/GenerationMonitor";
 
 export const CreativeStudio = () => {
   const [selectedStyle, setSelectedStyle] = useState("photorealistic");
@@ -24,6 +26,7 @@ export const CreativeStudio = () => {
 
   const { isGenerating, generationProgress, generateImage, pollGenerationStatus } = useImageGeneration();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const styleCategories = {
     artistic: [
@@ -66,12 +69,13 @@ export const CreativeStudio = () => {
 
   // Load user's generated images
   useEffect(() => {
-    loadGeneratedImages();
-  }, []);
+    if (user) {
+      loadGeneratedImages();
+    }
+  }, [user]);
 
   const loadGeneratedImages = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data: images, error } = await supabase
@@ -99,6 +103,8 @@ export const CreativeStudio = () => {
   };
 
   const handleGenerate = async () => {
+    console.log('Starting test generation with monitoring...');
+    
     const result = await generateImage({
       prompt,
       style_preset: selectedStyle,
@@ -112,13 +118,32 @@ export const CreativeStudio = () => {
     if (result) {
       setCurrentGeneration(result);
       
-      // Start polling for status
+      console.log(`Test case started: ${result.image_id}`);
+      console.log('Monitoring parameters:', {
+        style: selectedStyle,
+        lighting,
+        composition,
+        artistic_style: artisticStyle[0],
+        creativity: creativity[0],
+        mood: mood[0]
+      });
+      
+      // Start polling for status with enhanced logging
       const pollInterval = await pollGenerationStatus(result.image_id, (status) => {
+        console.log(`Status update for ${result.image_id}:`, status);
+        
         if (status.status === 'completed' && status.image_url) {
+          console.log(`Generation completed successfully: ${status.image_url}`);
           setCurrentImage(status.image_url);
           loadGeneratedImages();
           setCurrentGeneration(null);
+          
+          toast({
+            title: "Test Generation Complete",
+            description: "Image generated successfully with full monitoring data captured.",
+          });
         } else if (status.status === 'failed') {
+          console.error(`Generation failed:`, status.error_message);
           setCurrentGeneration(null);
         }
       });
@@ -131,6 +156,16 @@ export const CreativeStudio = () => {
     }
   };
 
+  if (!user) {
+    return (
+      <section id="studio" className="py-20 relative">
+        <div className="container mx-auto px-6 text-center">
+          <p className="text-xl text-foreground/70">Please sign in to access the Creative Studio</p>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section id="studio" className="py-20 relative">
       <div className="container mx-auto px-6">
@@ -140,8 +175,13 @@ export const CreativeStudio = () => {
             <span className="gradient-text">Studio</span>
           </h2>
           <p className="text-xl text-foreground/70 max-w-3xl mx-auto">
-            Advanced creative workspace with professional-grade AI image generation
+            Advanced creative workspace with professional-grade AI image generation and comprehensive monitoring
           </p>
+        </div>
+
+        {/* Add monitoring component */}
+        <div className="mb-8">
+          <GenerationMonitor />
         </div>
 
         {/* Split-screen Layout */}
@@ -153,7 +193,7 @@ export const CreativeStudio = () => {
             {/* Project Management */}
             <Card className="glass-card p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-playfair font-semibold gradient-text">Project Workspace</h3>
+                <h3 className="text-lg font-playfair font-semibold gradient-text">Test Environment</h3>
                 <div className="flex space-x-2">
                   <Button variant="outline" size="sm" className="border-gold-500/30">
                     <Save className="w-4 h-4 mr-2" />
@@ -166,8 +206,9 @@ export const CreativeStudio = () => {
                 </div>
               </div>
               <div className="text-sm text-foreground/60">
-                <p>Current Session: "Fashion Portrait Series"</p>
+                <p>Current Session: "Test Generation with Monitoring"</p>
                 <p>Generated Images: {generatedImages.length}</p>
+                <p>User: {user?.email}</p>
               </div>
             </Card>
 
@@ -328,7 +369,7 @@ export const CreativeStudio = () => {
 
             {/* Prompt Library */}
             <Card className="glass-card p-6">
-              <h3 className="text-lg font-playfair font-semibold mb-4 gradient-text">Inspiration Library</h3>
+              <h3 className="text-lg font-playfair font-semibold mb-4 gradient-text">Test Prompts</h3>
               <div className="space-y-2">
                 {promptLibrary.map((promptText, index) => (
                   <button
@@ -341,8 +382,8 @@ export const CreativeStudio = () => {
                 ))}
               </div>
               <div className="mt-4 flex space-x-2">
-                <Badge variant="outline" className="border-gold-500/30 text-gold-400">Trending</Badge>
-                <Badge variant="outline" className="border-gold-500/30 text-gold-400">Daily Challenge</Badge>
+                <Badge variant="outline" className="border-gold-500/30 text-gold-400">Test Case</Badge>
+                <Badge variant="outline" className="border-gold-500/30 text-gold-400">Monitored</Badge>
               </div>
             </Card>
           </div>
@@ -353,7 +394,7 @@ export const CreativeStudio = () => {
             {/* Main Canvas */}
             <Card className="glass-card p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-playfair font-semibold gradient-text">Creative Canvas</h3>
+                <h3 className="text-lg font-playfair font-semibold gradient-text">Test Canvas</h3>
                 <div className="flex space-x-2">
                   <Button variant="outline" size="sm" className="border-gold-500/30">
                     <Share2 className="w-4 h-4 mr-2" />
@@ -368,13 +409,13 @@ export const CreativeStudio = () => {
               
               {/* Prompt Input */}
               <div className="mb-4">
-                <label className="block text-sm font-medium mb-2 text-gold-400">Creative Vision</label>
+                <label className="block text-sm font-medium mb-2 text-gold-400">Test Prompt</label>
                 <textarea
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   className="w-full bg-black/30 border border-gold-500/20 rounded-lg p-4 text-foreground focus:border-gold-500 focus:ring-1 focus:ring-gold-500 transition-colors resize-none"
                   rows={3}
-                  placeholder="Describe your artistic vision..."
+                  placeholder="Enter your test prompt for monitoring..."
                 />
               </div>
 
@@ -402,8 +443,8 @@ export const CreativeStudio = () => {
                   <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center">
                     <div className="text-center text-white p-6">
                       <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
-                      <p className="text-lg font-semibold mb-2">Creating Your Masterpiece</p>
-                      <p className="text-sm text-foreground/80 mb-4">AI is generating your artistic vision...</p>
+                      <p className="text-lg font-semibold mb-2">Test Generation Running</p>
+                      <p className="text-sm text-foreground/80 mb-4">Monitoring all systems during generation...</p>
                       <Progress value={generationProgress} className="w-full max-w-xs mx-auto" />
                     </div>
                   </div>
@@ -413,7 +454,7 @@ export const CreativeStudio = () => {
                 <div className="absolute bottom-4 left-4 right-4">
                   <div className="bg-black/50 backdrop-blur-md rounded-lg p-3 flex items-center justify-between">
                     <div className="text-sm text-foreground/80">
-                      Resolution: 1024×1024 • Style: {selectedStyle} • {lighting} lighting
+                      Resolution: 1024×1024 • Style: {selectedStyle} • {lighting} lighting • Monitored
                     </div>
                     <Button 
                       size="sm" 
@@ -424,12 +465,12 @@ export const CreativeStudio = () => {
                       {isGenerating ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Generating
+                          Testing...
                         </>
                       ) : (
                         <>
                           <Play className="w-4 h-4 mr-2" />
-                          Generate
+                          Start Test
                         </>
                       )}
                     </Button>
@@ -440,14 +481,14 @@ export const CreativeStudio = () => {
 
             {/* Version History */}
             <Card className="glass-card p-6">
-              <h3 className="text-lg font-playfair font-semibold mb-4 gradient-text">Recent Generations</h3>
+              <h3 className="text-lg font-playfair font-semibold mb-4 gradient-text">Test Results</h3>
               <div className="grid grid-cols-4 gap-3">
                 {generatedImages.slice(0, 8).map((image, index) => (
                   <div key={image.id} className="relative artistic-frame premium-hover aspect-square group">
                     {image.status === 'completed' && image.image_url ? (
                       <img
                         src={image.image_url}
-                        alt={`Generated ${index + 1}`}
+                        alt={`Test ${index + 1}`}
                         className="w-full h-full object-cover cursor-pointer"
                         onClick={() => setCurrentImage(image.image_url)}
                       />
